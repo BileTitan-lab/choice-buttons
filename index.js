@@ -45,38 +45,38 @@ export function parseChoices(text) {
 }
 
 export async function sendChoice(text) {
-    if (busy || !text) return;
+    if (busy || typeof text !== 'string' || !text.trim()) return;
     busy = true;
-    const ctx = context();
-    const chat = ctx.chat;
-    const count = chat.length;
     try {
-        // 特殊 STscript 语法交给输入框，避免被解释为第二条命令。
-        if (typeof ctx.executeSlashCommandsWithOptions === 'function' &&
-            !/[\\|{}"\r\n=]/.test(text) && !/^\s*\//.test(text)) {
-            try {
-                const result = await ctx.executeSlashCommandsWithOptions('/send ' + text, {
-                    handleParserErrors: false, handleExecutionErrors: false,
-                });
-                if (result && result.isAborted) throw new Error('发送已中止');
-                if (chat.length > count) return;
-            } catch (error) {
-                console.warn('[choice-buttons] slash 发送失败', error);
-                // 已插入消息后的错误不能再次发送。
-                if (chat.length > count) return;
-            }
-        }
-        if (context().chat !== chat) throw new Error('聊天已切换，请重新选择');
+        const ctx = context();
         if (/^\s*\//.test(text)) throw new Error('选项不能以 / 开头，以免执行命令');
-        const input = document.querySelector('#send_textarea');
-        const send = document.querySelector('#send_but');
-        if (!input || !send || input.disabled || send.disabled || !send.getClientRects().length) {
-            throw new Error('发送控件暂不可用');
-        }
+        const input = document.getElementById('send_textarea');
+        console.log('[choice-buttons] 输入框状态', {
+            found: Boolean(input), disabled: input ? Boolean(input.disabled) : null,
+        });
+        if (!input || input.disabled || input.readOnly) throw new Error('输入框暂不可用');
         if (input.value.trim()) throw new Error('请先发送或清空输入框中的草稿');
         input.value = text;
         input.dispatchEvent(new Event('input', { bubbles: true }));
+        console.log('[choice-buttons] 已填写选项并派发 input 事件');
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const current = context();
+        if (current.chat !== ctx.chat || current.chatId !== ctx.chatId) {
+            throw new Error('聊天已切换，请重新选择');
+        }
+        if (document.getElementById('send_textarea') !== input || input.value !== text ||
+            input.disabled || input.readOnly) throw new Error('输入框状态已改变，请手动发送');
+        const send = document.getElementById('send_but');
+        const disabled = send && (Boolean(send.disabled) || send.hasAttribute('disabled') ||
+            send.getAttribute('aria-disabled') === 'true');
+        const visible = send && send.getClientRects().length > 0;
+        console.log('[choice-buttons] 发送按钮状态', {
+            found: Boolean(send), disabled: Boolean(disabled), visible: Boolean(visible),
+        });
+        if (!send || disabled || !visible) throw new Error('发送按钮暂不可用，选项已保留在输入框中');
+        // 1.19.0 的 send_form 是 div；点击 send_but 才会进入正常生成流程。
         send.click();
+        console.log('[choice-buttons] 已点击发送按钮，由酒馆处理消息与生成');
     } catch (error) {
         console.error('[choice-buttons]', error);
         window.alert('选项未发送：' + error.message);
