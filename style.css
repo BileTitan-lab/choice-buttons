@@ -1,0 +1,29 @@
+.choice-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+.choice-buttons .choice-btn {
+    min-height: 44px;
+    max-width: 100%;
+    padding: 8px 14px;
+    border: 1px solid var(--SmartThemeBorderColor, #777);
+    border-radius: 12px;
+    color: var(--SmartThemeBodyColor, #eee);
+    background: var(--SmartThemeBlurTintColor, #292929);
+    font: inherit;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+.choice-btn:hover { filter: brightness(1.15); }
+.choice-btn:active { filter: brightness(.85); transform: translateY(1px); }
+.choice-btn:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.choice-btn:disabled { opacity: .55; cursor: wait; }
+.mes_text .ct-hidden { display: none !important; }
+#choice-buttons-settings { margin: 12px 0; }
+@media (max-width: 480px) {
+    .choice-buttons .choice-btn { width: 100%; text-align: left; }
+}
