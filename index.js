@@ -4,22 +4,44 @@ let timer;
 let settings;
 const context = () => window.SillyTavern.getContext();
 
+export function getRawText(mesEl, mesId) {
+    const ctx = context();
+    const message = ctx.chat && ctx.chat[mesId];
+    if (message && typeof message.mes === 'string') return message.mes;
+    const root = mesEl && mesEl.querySelector('.mes_text');
+    if (!root) return '';
+    const copy = root.cloneNode(true);
+    copy.querySelectorAll('.choice-buttons').forEach(row => row.remove());
+    return copy.textContent || '';
+}
+
 export function parseChoices(text) {
-    const match = /<choices\s*>([\s\S]*?)<\/choices\s*>/i.exec(text || '');
+    if (typeof text !== 'string') return [];
+    text = text.replace(/&lt;|&#0*60;|&#x0*3c;/gi, '<')
+        .replace(/&gt;|&#0*62;|&#x0*3e;/gi, '>');
+    // 只接受回复末尾的明确标记；普通 JSON、教程正文不能作为候选选项。
+    const match = /(?:^|\n)[ \t]*<choices\s*>([\s\S]*?)<\/choices\s*>\s*$/i.exec(text) ||
+        /(?:^|\n)[ \t]*```choices[ \t]*\r?\n([\s\S]*?)\r?\n[ \t]*```\s*$/i.exec(text);
     if (!match) return [];
+    const body = match[1].trim();
+    if (body[0] !== '[' || body[body.length - 1] !== ']') return [];
     let values;
     try {
-        values = JSON.parse(match[1].trim());
-        if (!Array.isArray(values)) return [];
+        values = JSON.parse(body);
     } catch (error) {
-        console.log('[choice-buttons] 使用文本降级解析');
-        values = match[1].trim().replace(/^\[|\]$/g, '').split(/[\r\n、]+/);
-        values = values.map(value => value.trim()
-            .replace(/^(?:[-*•]|\d+[.．、)）]|[一二三四五六七八九十]+[、.．])\s*/, '')
-            .replace(/^["'“‘]+|["'”’，,]+$/g, ''));
+        // 仅容忍中文双引号和尾逗号，且整个数组必须都由字符串组成。
+        const token = '"(?:[^"\\\\\r\n]|\\\\.)*"|“[^“”\r\n]*”';
+        const array = new RegExp('^\\[\\s*(?:' + token + ')(?:\\s*,\\s*(?:' + token + '))*\\s*,?\\s*\\]$');
+        if (!array.test(body)) return [];
+        try {
+            values = body.match(new RegExp(token, 'g')).map(value =>
+                value[0] === '“' ? value.slice(1, -1) : JSON.parse(value));
+        } catch (invalidString) { return []; }
+        console.log('[choice-buttons] 已容错解析选项数组');
     }
-    return values.filter(value => typeof value === 'string')
-        .map(value => value.trim()).filter(Boolean);
+    if (!Array.isArray(values) || values.length < 2 || values.length > 4 ||
+        values.some(value => typeof value !== 'string' || !value.trim() || /[\r\n]/.test(value))) return [];
+    return values.map(value => value.trim());
 }
 
 export async function sendChoice(text) {
@@ -116,9 +138,11 @@ export function renderButtons() {
     const ctx = context();
     document.querySelectorAll('#chat .mes[mesid]').forEach(mes => {
         const root = mes.querySelector('.mes_text');
-        const message = ctx.chat[Number(mes.getAttribute('mesid'))];
+        const mesId = Number(mes.getAttribute('mesid'));
+        const message = ctx.chat[mesId];
         if (!root || !message || root.querySelector('textarea')) return;
-        const options = message.is_user || message.is_system ? [] : parseChoices(message.mes);
+        const raw = getRawText(mes, mesId);
+        const options = message.is_user || message.is_system ? [] : parseChoices(raw);
         const signature = JSON.stringify(options);
         const existing = root.querySelector('.choice-buttons');
         if (existing && existing.dataset.choices !== signature) existing.remove();
