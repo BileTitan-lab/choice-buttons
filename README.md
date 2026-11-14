@@ -9,6 +9,7 @@ SillyTavern 第三方扩展，将 AI 回复中的 `<choices>` 选项转换为按
 - 扩展面板提供隐藏原文开关，设置随 SillyTavern 保存。仅修改显示 DOM，不改写 `message.mes`。
 - 按钮使用 textContent，选项中的 HTML 不会作为按钮代码执行。
 - 点击选项后填写酒馆输入框、派发 input 事件，等待 50 毫秒后点击发送按钮，走与手动发送相同的消息与生成流程。
+- 优先读取 `chat[mesId].mes`。兼容转义标签、常见零宽字符及数组外的 HTML 格式标签；聊天 DOM 被其他扩展重建后自动重新挂载按钮。
 
 ## 安装
 
@@ -46,5 +47,7 @@ choices 标签必须独占起始行并放在整条回复的末尾，标签内部
 - 隐藏支持 DOM 中保留的 choices 元素及跨文本节点的完整标签。若其他扩展或 HTML 清理已经移除了标签，仅留下选项正文，无法可靠识别隐藏范围；按钮仍从原始消息解析。可关闭冲突的正则处理后重试。
 - 没有在真实安卓 WebView / SillyDroid 上实机验证。过旧 WebView 需更新到能正常运行 SillyTavern 的版本。
 - 日志前缀为 `[choice-buttons]`，主要在浏览器/WebView 的 JavaScript 控制台；App 服务端终端不一定显示前端日志。
+- 检测到 choices 标记但格式无效时，日志会显示消息编号和原文前 200 字符；相同消息内容不重复打印。排查共存问题时可查看这些日志。
+- 1.0.3 增加了 DOM 重建后的恢复处理，但没有在你的酒馆助手脚本和安卓设备上实测。若其他脚本改写了 `chat[mesId].mes` 本身或持续清空按钮，仍需结合实际脚本排查。
 
 接口参考：https://docs.sillytavern.app/for-contributors/writing-extensions/
